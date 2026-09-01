@@ -95,15 +95,18 @@ canvas{display:block;width:100%;height:230px;background:#111827;border-radius:12
       <div class="grid2" style="margin-top:14px">
         <div class="compareBox">
           <b>音①</b>
+          <canvas id="waveA" width="420" height="150" style="height:150px;margin-top:10px"></canvas>
           <p>音量: <span id="aLevel">---</span></p>
           <p>周波数: <span id="aFreq">---</span> Hz</p>
         </div>
         <div class="compareBox">
           <b>音②</b>
+          <canvas id="waveB" width="420" height="150" style="height:150px;margin-top:10px"></canvas>
           <p>音量: <span id="bLevel">---</span></p>
           <p>周波数: <span id="bFreq">---</span> Hz</p>
         </div>
       </div>
+      <p class="small">※ 音①と音②は同じ時間幅・同じ縦倍率で表示しています。</p>
       <p id="compareMsg" class="gameMsg"></p>
     </div>
   </section>
@@ -153,6 +156,41 @@ let mode='home';
 let stream=null, ac=null, analyser=null, source=null, raf=null;
 let data=null, smoothFreq=null, currentLevel=0, currentFreq=null, currentConfidence=0;
 let snapA=null,snapB=null;
+
+function drawStoredWave(canvasId, samples){
+  const c=$(canvasId), g=c.getContext('2d');
+  g.clearRect(0,0,c.width,c.height);
+  g.fillStyle='#111827';
+  g.fillRect(0,0,c.width,c.height);
+
+  // 中央線
+  g.strokeStyle='#64748b';
+  g.lineWidth=1;
+  g.beginPath();
+  g.moveTo(0,c.height/2);
+  g.lineTo(c.width,c.height/2);
+  g.stroke();
+
+  if(!samples || !samples.length){
+    g.fillStyle='#9ca3af';
+    g.font='16px sans-serif';
+    g.textAlign='center';
+    g.fillText('まだ記録されていません', c.width/2, c.height/2+6);
+    return;
+  }
+
+  // 観察画面と同じ倍率で描画する
+  g.strokeStyle='#f8fafc';
+  g.lineWidth=2;
+  g.beginPath();
+  for(let i=0;i<samples.length;i++){
+    const xx=i/(samples.length-1)*c.width;
+    const yy=c.height/2-samples[i]*(c.height*.44);
+    if(i===0) g.moveTo(xx,yy);
+    else g.lineTo(xx,yy);
+  }
+  g.stroke();
+}
 
 let gameActive=false, round=0, score=0, challenge=null, hold=0, lastTime=0;
 
@@ -300,9 +338,26 @@ $('stopMic').onclick=()=>{
 
 function saveSnap(which){
   if(!stream){alert('先にマイクを開始してください');return}
-  const s={level:currentLevel,freq:currentFreq?Math.round(currentFreq):null};
-  if(which==='A'){snapA=s;$('aLevel').textContent=s.level;$('aFreq').textContent=s.freq??'---'}
-  else{snapB=s;$('bLevel').textContent=s.level;$('bFreq').textContent=s.freq??'---'}
+
+  // クリックした瞬間の波形を別配列として固定保存
+  const wave = data ? Array.from(data) : [];
+  const s={
+    level:currentLevel,
+    freq:currentFreq?Math.round(currentFreq):null,
+    wave:wave
+  };
+
+  if(which==='A'){
+    snapA=s;
+    $('aLevel').textContent=s.level;
+    $('aFreq').textContent=s.freq??'---';
+    drawStoredWave('waveA',s.wave);
+  }else{
+    snapB=s;
+    $('bLevel').textContent=s.level;
+    $('bFreq').textContent=s.freq??'---';
+    drawStoredWave('waveB',s.wave);
+  }
   compareSnaps();
 }
 $('saveA').onclick=()=>saveSnap('A');
@@ -311,6 +366,8 @@ $('clearCompare').onclick=()=>{
   snapA=snapB=null;
   $('aLevel').textContent=$('aFreq').textContent=$('bLevel').textContent=$('bFreq').textContent='---';
   $('compareMsg').textContent='';
+  drawStoredWave('waveA',null);
+  drawStoredWave('waveB',null);
 };
 function compareSnaps(){
   if(!snapA||!snapB)return;
@@ -392,6 +449,8 @@ function updateGame(now){
 }
 
 showMode('home');
+drawStoredWave('waveA',null);
+drawStoredWave('waveB',null);
 })();
 </script>
 </body>
