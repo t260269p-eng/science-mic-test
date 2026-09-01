@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>音の研究室 v1</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d6dbe4;--accent:#2563eb}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP","Yu Gothic",Meiryo,sans-serif}
+.wrap{max-width:980px;margin:auto;padding:18px}
+h1{margin:0 0 8px;font-size:28px}
+h2{margin:0 0 14px}
+p{line-height:1.6}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;margin:14px 0}
+.menu{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.menu button{min-height:120px;font-size:22px}
+button{border:0;border-radius:12px;padding:13px 18px;font-size:16px;font-weight:800;cursor:pointer;background:var(--accent);color:white}
+button.alt{background:#374151}
+button.light{background:#e5e7eb;color:#111827}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.status{font-weight:800;padding:9px 13px;border-radius:999px;background:#eef2ff;display:inline-block}
+.ok{color:#166534}.bad{color:#991b1b}.warn{color:#92400e}
+.hidden{display:none!important}
+.meter{height:30px;background:#e5e7eb;border-radius:999px;overflow:hidden;border:1px solid var(--border)}
+.bar{height:100%;width:0;background:linear-gradient(90deg,#22c55e,#eab308,#ef4444)}
+canvas{display:block;width:100%;height:230px;background:#111827;border-radius:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.big{font-size:40px;font-weight:900}
+.small{font-size:14px;color:var(--muted)}
+.compareBox{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:14px}
+.gameTarget{font-size:28px;font-weight:900;text-align:center;margin:8px 0}
+.gameMsg{text-align:center;font-size:22px;font-weight:800;min-height:34px}
+.progress{height:26px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+.progressFill{height:100%;width:0;background:#111827}
+.score{font-size:28px;font-weight:900}
+@media(max-width:700px){.menu,.grid2{grid-template-columns:1fr}.wrap{padding:10px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎤 音の研究室</h1>
+  <p class="small">音声は保存・送信しません。Chromebook内だけで解析します。</p>
+
+  <div id="home" class="card">
+    <h2>どちらを使う？</h2>
+    <div class="menu">
+      <button id="labBtn">🔬 観察・比較モード<br><span class="small" style="color:white">波形・音量・周波数を調べる</span></button>
+      <button id="gameBtn" class="alt">🎮 音チャレンジ<br><span class="small" style="color:white">声で高さ・大きさをコントロール</span></button>
+    </div>
+  </div>
+
+  <div id="common" class="card hidden">
+    <div class="row">
+      <button id="startMic">マイクを開始</button>
+      <button id="stopMic" class="alt" disabled>停止</button>
+      <button id="homeBtn" class="light">← メニュー</button>
+      <span id="status" class="status">未開始</span>
+    </div>
+  </div>
+
+  <section id="lab" class="hidden">
+    <div class="card">
+      <h2>入力レベル</h2>
+      <div class="meter"><div id="levelBar" class="bar"></div></div>
+      <p>音量: <b id="levelText">0</b></p>
+    </div>
+
+    <div class="card">
+      <h2>波形</h2>
+      <canvas id="scope" width="900" height="230"></canvas>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>周波数</h2>
+        <div class="big"><span id="freq">---</span> Hz</div>
+        <p class="small">高い音ほど1秒間の振動回数が多くなります。</p>
+      </div>
+      <div class="card">
+        <h2>音名</h2>
+        <div class="big" id="note">---</div>
+        <p>判定の確かさ: <b id="confidence">---</b></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2つの音を比べる</h2>
+      <div class="row">
+        <button id="saveA">音①を記録</button>
+        <button id="saveB" class="alt">音②を記録</button>
+        <button id="clearCompare" class="light">記録を消す</button>
+      </div>
+      <div class="grid2" style="margin-top:14px">
+        <div class="compareBox">
+          <b>音①</b>
+          <p>音量: <span id="aLevel">---</span></p>
+          <p>周波数: <span id="aFreq">---</span> Hz</p>
+        </div>
+        <div class="compareBox">
+          <b>音②</b>
+          <p>音量: <span id="bLevel">---</span></p>
+          <p>周波数: <span id="bFreq">---</span> Hz</p>
+        </div>
+      </div>
+      <p id="compareMsg" class="gameMsg"></p>
+    </div>
+  </section>
+
+  <section id="game" class="hidden">
+    <div class="card">
+      <h2>🎮 音チャレンジ</h2>
+      <p>声を使って、指定された「高い・低い」「大きい・小さい」に合わせよう。</p>
+      <div class="row">
+        <button id="startGame">ゲーム開始</button>
+        <span class="score">得点: <span id="score">0</span></span>
+        <span>ラウンド: <b id="round">0</b>/5</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="target" class="gameTarget">ゲーム開始を押してね</div>
+      <div class="progress"><div id="holdBar" class="progressFill"></div></div>
+      <div id="gameMsg" class="gameMsg"></div>
+      <div class="grid2" style="margin-top:14px">
+        <div class="compareBox">
+          <b>今の音量</b>
+          <div class="big"><span id="gameLevel">0</span></div>
+        </div>
+        <div class="compareBox">
+          <b>今の周波数</b>
+          <div class="big"><span id="gameFreq">---</span> Hz</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>このゲームで使っている理科</h2>
+      <p>・大きい音 → 振幅が大きい<br>
+         ・小さい音 → 振幅が小さい<br>
+         ・高い音 → 周波数が大きい<br>
+         ・低い音 → 周波数が小さい</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+
+let mode='home';
+let stream=null, ac=null, analyser=null, source=null, raf=null;
+let data=null, smoothFreq=null, currentLevel=0, currentFreq=null, currentConfidence=0;
+let snapA=null,snapB=null;
+
+let gameActive=false, round=0, score=0, challenge=null, hold=0, lastTime=0;
+
+function showMode(m){
+  mode=m;
+  $('home').classList.toggle('hidden',m!=='home');
+  $('common').classList.toggle('hidden',m==='home');
+  $('lab').classList.toggle('hidden',m!=='lab');
+  $('game').classList.toggle('hidden',m!=='game');
+}
+$('labBtn').onclick=()=>showMode('lab');
+$('gameBtn').onclick=()=>showMode('game');
+$('homeBtn').onclick=()=>{gameActive=false;showMode('home')};
+
+function status(s,cls=''){ $('status').textContent=s; $('status').className='status '+cls; }
+
+function noteName(freq){
+  if(!freq||freq<40||freq>2000)return'---';
+  const midi=Math.round(69+12*Math.log2(freq/440));
+  const names=['ド','ド♯','レ','レ♯','ミ','ファ','ファ♯','ソ','ソ♯','ラ','ラ♯','シ'];
+  return names[(midi%12+12)%12]+(Math.floor(midi/12)-1);
+}
+
+function detectPitch(buf,sampleRate){
+  const n=buf.length;
+  let mean=0;
+  for(let i=0;i<n;i++)mean+=buf[i];
+  mean/=n;
+  let rms=0;
+  const x=new Float32Array(n);
+  for(let i=0;i<n;i++){x[i]=buf[i]-mean;rms+=x[i]*x[i]}
+  rms=Math.sqrt(rms/n);
+  if(rms<0.008)return{freq:-1,confidence:0};
+
+  const minFreq=50,maxFreq=1000;
+  const minLag=Math.floor(sampleRate/maxFreq);
+  const maxLag=Math.min(Math.floor(sampleRate/minFreq),Math.floor(n/2));
+  let bestLag=-1,bestCorr=-1;
+  const corr=new Float32Array(maxLag+1);
+
+  for(let lag=minLag;lag<=maxLag;lag++){
+    let sum=0,e1=0,e2=0,lim=n-lag;
+    for(let i=0;i<lim;i++){
+      const a=x[i],b=x[i+lag];
+      sum+=a*b;e1+=a*a;e2+=b*b;
+    }
+    const c=(e1>0&&e2>0)?sum/Math.sqrt(e1*e2):0;
+    corr[lag]=c;
+    if(c>bestCorr){bestCorr=c;bestLag=lag}
+  }
+  if(bestLag<0||bestCorr<0.35)return{freq:-1,confidence:Math.max(0,bestCorr)};
+
+  let lag=bestLag;
+  if(bestLag>minLag&&bestLag<maxLag){
+    const y1=corr[bestLag-1],y2=corr[bestLag],y3=corr[bestLag+1];
+    const d=y1-2*y2+y3;
+    if(Math.abs(d)>1e-9)lag=bestLag+0.5*(y1-y3)/d;
+  }
+  const f=sampleRate/lag;
+  return{freq:(f>=minFreq&&f<=maxFreq)?f:-1,confidence:bestCorr};
+}
+
+function drawScope(){
+  if(!analyser||!ac)return;
+  analyser.getFloatTimeDomainData(data);
+
+  let rms=0;
+  for(let i=0;i<data.length;i++)rms+=data[i]*data[i];
+  rms=Math.sqrt(rms/data.length);
+  currentLevel=Math.min(100,Math.round(rms*300));
+  $('levelBar').style.width=currentLevel+'%';
+  $('levelText').textContent=currentLevel;
+  $('gameLevel').textContent=currentLevel;
+
+  const c=$('scope'),g=c.getContext('2d');
+  g.clearRect(0,0,c.width,c.height);
+  g.fillStyle='#111827';g.fillRect(0,0,c.width,c.height);
+  g.strokeStyle='#64748b';g.lineWidth=1;
+  g.beginPath();g.moveTo(0,c.height/2);g.lineTo(c.width,c.height/2);g.stroke();
+  g.strokeStyle='#f8fafc';g.lineWidth=2;g.beginPath();
+  for(let i=0;i<data.length;i++){
+    const xx=i/(data.length-1)*c.width;
+    const yy=c.height/2-data[i]*(c.height*.44);
+    if(i===0)g.moveTo(xx,yy);else g.lineTo(xx,yy);
+  }
+  g.stroke();
+
+  const r=detectPitch(data,ac.sampleRate);
+  currentConfidence=r.confidence||0;
+  if(r.freq>0){
+    smoothFreq=smoothFreq==null?r.freq:smoothFreq*.82+r.freq*.18;
+    currentFreq=smoothFreq;
+    $('freq').textContent=Math.round(currentFreq);
+    $('note').textContent=noteName(currentFreq);
+    $('confidence').textContent=Math.round(currentConfidence*100)+'%';
+    $('gameFreq').textContent=Math.round(currentFreq);
+  }else{
+    if(rms<.006){smoothFreq=null;currentFreq=null}
+    if(!currentFreq){
+      $('freq').textContent='---';
+      $('note').textContent='---';
+      $('gameFreq').textContent='---';
+    }
+    $('confidence').textContent=Math.round(currentConfidence*100)+'%';
+  }
+
+  updateGame(performance.now());
+  raf=requestAnimationFrame(drawScope);
+}
+
+$('startMic').onclick=async()=>{
+  $('startMic').disabled=true;status('マイク要求中…','warn');
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},
+      video:false
+    });
+    const AC=window.AudioContext||window.webkitAudioContext;
+    ac=new AC();
+    if(ac.state==='suspended')await ac.resume();
+    analyser=ac.createAnalyser();
+    analyser.fftSize=4096;
+    analyser.smoothingTimeConstant=0;
+    data=new Float32Array(analyser.fftSize);
+    source=ac.createMediaStreamSource(stream);
+    source.connect(analyser);
+    $('stopMic').disabled=false;
+    status('マイク取得成功 ✅','ok');
+    drawScope();
+  }catch(e){
+    status(e.name||'Error','bad');
+  }finally{$('startMic').disabled=false}
+};
+
+$('stopMic').onclick=()=>{
+  if(raf)cancelAnimationFrame(raf);
+  if(stream)stream.getTracks().forEach(t=>t.stop());
+  if(source)try{source.disconnect()}catch(e){}
+  if(ac)try{ac.close()}catch(e){}
+  stream=ac=analyser=source=raf=null;
+  gameActive=false;
+  $('stopMic').disabled=true;
+  status('停止しました');
+};
+
+function saveSnap(which){
+  if(!stream){alert('先にマイクを開始してください');return}
+  const s={level:currentLevel,freq:currentFreq?Math.round(currentFreq):null};
+  if(which==='A'){snapA=s;$('aLevel').textContent=s.level;$('aFreq').textContent=s.freq??'---'}
+  else{snapB=s;$('bLevel').textContent=s.level;$('bFreq').textContent=s.freq??'---'}
+  compareSnaps();
+}
+$('saveA').onclick=()=>saveSnap('A');
+$('saveB').onclick=()=>saveSnap('B');
+$('clearCompare').onclick=()=>{
+  snapA=snapB=null;
+  $('aLevel').textContent=$('aFreq').textContent=$('bLevel').textContent=$('bFreq').textContent='---';
+  $('compareMsg').textContent='';
+};
+function compareSnaps(){
+  if(!snapA||!snapB)return;
+  let msgs=[];
+  if(snapA.level!==snapB.level){
+    msgs.push(snapA.level>snapB.level?'音①の方が大きい':'音②の方が大きい');
+  }
+  if(snapA.freq&&snapB.freq&&Math.abs(snapA.freq-snapB.freq)>8){
+    msgs.push(snapA.freq>snapB.freq?'音①の方が高い':'音②の方が高い');
+  }
+  $('compareMsg').textContent=msgs.join(' ／ ');
+}
+
+/* GAME */
+const challenges=[
+  {type:'pitchHigh',text:'高い声を出せ！',hint:'周波数 260 Hz 以上'},
+  {type:'pitchLow',text:'低い声を出せ！',hint:'周波数 180 Hz 以下'},
+  {type:'loud',text:'大きい声を出せ！',hint:'音量 18 以上'},
+  {type:'soft',text:'小さい声を出せ！',hint:'音量 4〜10'},
+  {type:'pitchMid',text:'真ん中の高さをねらえ！',hint:'周波数 190〜250 Hz'}
+];
+
+$('startGame').onclick=()=>{
+  if(!stream){alert('先にマイクを開始してください');return}
+  score=0;round=0;gameActive=true;hold=0;lastTime=performance.now();
+  $('score').textContent='0';
+  nextChallenge();
+};
+
+function nextChallenge(){
+  round++;
+  if(round>5){
+    gameActive=false;
+    $('target').textContent='終了！';
+    $('gameMsg').textContent=`5問終了　得点 ${score} 点`;
+    $('holdBar').style.width='0%';
+    return;
+  }
+  $('round').textContent=round;
+  challenge=challenges[Math.floor(Math.random()*challenges.length)];
+  $('target').textContent=challenge.text+'　'+challenge.hint;
+  $('gameMsg').textContent='条件に合わせて1秒キープ！';
+  hold=0;
+  $('holdBar').style.width='0%';
+}
+
+function successCondition(){
+  if(!challenge)return false;
+  switch(challenge.type){
+    case'pitchHigh': return currentFreq&&currentFreq>=260&&currentConfidence>.35;
+    case'pitchLow': return currentFreq&&currentFreq<=180&&currentFreq>=70&&currentConfidence>.35;
+    case'loud': return currentLevel>=18;
+    case'soft': return currentLevel>=4&&currentLevel<=10;
+    case'pitchMid': return currentFreq&&currentFreq>=190&&currentFreq<=250&&currentConfidence>.35;
+  }
+  return false;
+}
+
+function updateGame(now){
+  if(!gameActive||!challenge)return;
+  const dt=Math.min(100,now-lastTime);
+  lastTime=now;
+  if(successCondition()){
+    hold+=dt;
+    $('gameMsg').textContent='いいぞ、そのまま！';
+  }else{
+    hold=Math.max(0,hold-dt*1.4);
+    $('gameMsg').textContent='条件に合わせよう';
+  }
+  $('holdBar').style.width=Math.min(100,hold/1000*100)+'%';
+  if(hold>=1000){
+    score+=100;
+    $('score').textContent=score;
+    $('gameMsg').textContent='クリア！ +100点';
+    hold=0;
+    setTimeout(()=>{if(gameActive)nextChallenge()},700);
+    challenge=null;
+  }
+}
+
+showMode('home');
+})();
+</script>
+</body>
+</html>
