@@ -1,474 +1,239 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>理科マイク診断テスト</title>
-  <style>
-    :root{
-      --bg:#f6f7f9;
-      --card:#ffffff;
-      --text:#1f2937;
-      --muted:#6b7280;
-      --border:#d1d5db;
-      --ok:#166534;
-      --warn:#92400e;
-      --bad:#991b1b;
-      --accent:#1d4ed8;
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP","Yu Gothic",Meiryo,sans-serif;
-      background:var(--bg);
-      color:var(--text);
-    }
-    .wrap{
-      max-width:900px;
-      margin:0 auto;
-      padding:24px;
-    }
-    h1{font-size:28px;margin:0 0 8px}
-    .lead{color:var(--muted);margin:0 0 20px;line-height:1.7}
-    .card{
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius:14px;
-      padding:18px;
-      margin:14px 0;
-      box-shadow:0 1px 2px rgba(0,0,0,.04);
-    }
-    .row{
-      display:flex;
-      gap:12px;
-      flex-wrap:wrap;
-      align-items:center;
-    }
-    button{
-      appearance:none;
-      border:0;
-      border-radius:10px;
-      padding:12px 18px;
-      font-size:16px;
-      font-weight:700;
-      cursor:pointer;
-      background:var(--accent);
-      color:#fff;
-    }
-    button.secondary{
-      background:#374151;
-    }
-    button:disabled{
-      opacity:.5;
-      cursor:not-allowed;
-    }
-    .status{
-      font-weight:700;
-      padding:8px 12px;
-      border-radius:999px;
-      background:#eef2ff;
-      display:inline-block;
-    }
-    .ok{color:var(--ok)}
-    .warn{color:var(--warn)}
-    .bad{color:var(--bad)}
-    .diag{
-      display:grid;
-      grid-template-columns:220px 1fr;
-      gap:8px 14px;
-      font-size:15px;
-    }
-    .diag div:nth-child(odd){
-      color:var(--muted);
-    }
-    .meter{
-      width:100%;
-      height:30px;
-      background:#e5e7eb;
-      border-radius:999px;
-      overflow:hidden;
-      border:1px solid var(--border);
-    }
-    .bar{
-      height:100%;
-      width:0%;
-      background:linear-gradient(90deg,#22c55e,#eab308,#ef4444);
-      transition:width .06s linear;
-    }
-    canvas{
-      width:100%;
-      height:220px;
-      background:#111827;
-      border-radius:10px;
-      border:1px solid #000;
-      display:block;
-    }
-    .big{
-      font-size:34px;
-      font-weight:800;
-      letter-spacing:.5px;
-    }
-    pre{
-      white-space:pre-wrap;
-      word-break:break-word;
-      background:#111827;
-      color:#e5e7eb;
-      padding:14px;
-      border-radius:10px;
-      min-height:120px;
-      margin:0;
-      font-size:13px;
-      line-height:1.6;
-    }
-    .note{
-      font-size:14px;
-      color:var(--muted);
-      line-height:1.7;
-    }
-    @media (max-width:640px){
-      .wrap{padding:14px}
-      .diag{grid-template-columns:1fr}
-      .diag div:nth-child(odd){font-weight:700;margin-top:6px}
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理科 音の波形・周波数テスト v2</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d7dce4;--accent:#2563eb}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP","Yu Gothic",Meiryo,sans-serif}
+.wrap{max-width:920px;margin:auto;padding:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin:14px 0}
+h1{font-size:27px;margin:0 0 8px} h2{margin:0 0 16px}
+p{line-height:1.6}
+button{border:0;border-radius:10px;padding:13px 18px;font-size:16px;font-weight:700;cursor:pointer;background:var(--accent);color:white;margin-right:8px}
+button.stop{background:#374151}
+button:disabled{opacity:.45}
+.status{font-weight:800;padding:9px 13px;border-radius:999px;background:#eef2ff;display:inline-block}
+.ok{color:#166534}.bad{color:#991b1b}.warn{color:#92400e}
+.meter{height:30px;background:#e5e7eb;border-radius:999px;overflow:hidden;border:1px solid var(--border)}
+.bar{height:100%;width:0;background:linear-gradient(90deg,#22c55e,#eab308,#ef4444)}
+canvas{display:block;width:100%;height:230px;background:#111827;border-radius:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.big{font-size:42px;font-weight:900}
+.note{font-size:28px;font-weight:800}
+.small{color:var(--muted);font-size:14px}
+pre{background:#111827;color:#e5e7eb;padding:14px;border-radius:10px;white-space:pre-wrap;word-break:break-word}
+@media(max-width:650px){.grid{grid-template-columns:1fr}.wrap{padding:12px}}
+</style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🎤 理科マイク診断テスト</h1>
-  <p class="lead">
-    音声は保存・送信しません。Chromebook内だけで解析します。
-    「マイクを開始」を押して、音量・波形・周波数が変化するか確認してください。
-  </p>
+  <h1>🎤 理科 音の波形・周波数テスト v2</h1>
+  <p class="small">音声は保存・送信しません。端末内だけで解析します。</p>
 
   <div class="card">
-    <div class="row">
-      <button id="startBtn">マイクを開始</button>
-      <button id="stopBtn" class="secondary" disabled>停止</button>
-      <span id="status" class="status">未開始</span>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>環境チェック</h2>
-    <div class="diag">
-      <div>HTTPS / Secure Context</div><div id="secure">確認中...</div>
-      <div>mediaDevices</div><div id="mediaDevices">確認中...</div>
-      <div>getUserMedia</div><div id="gum">確認中...</div>
-      <div>AudioContext</div><div id="audioCtxSupport">確認中...</div>
-      <div>ブラウザ</div><div id="ua"></div>
-      <div>現在のURL</div><div id="url"></div>
-    </div>
+    <button id="start">マイクを開始</button>
+    <button id="stop" class="stop" disabled>停止</button>
+    <span id="status" class="status">未開始</span>
   </div>
 
   <div class="card">
     <h2>入力レベル</h2>
-    <div class="meter"><div id="levelBar" class="bar"></div></div>
-    <p>音量: <span id="levelText">0</span></p>
+    <div class="meter"><div id="bar" class="bar"></div></div>
+    <p>音量: <b id="level">0</b></p>
   </div>
 
   <div class="card">
     <h2>波形</h2>
-    <canvas id="scope" width="900" height="220"></canvas>
+    <canvas id="scope" width="900" height="230"></canvas>
   </div>
 
-  <div class="card">
-    <h2>周波数</h2>
-    <div class="big"><span id="freq">---</span> Hz</div>
-    <p id="noteName" class="note">音名: ---</p>
+  <div class="grid">
+    <div class="card">
+      <h2>周波数</h2>
+      <div class="big"><span id="freq">---</span> Hz</div>
+      <p class="small">声を「あーーー」と一定に伸ばすと安定しやすいです。</p>
+    </div>
+    <div class="card">
+      <h2>音名</h2>
+      <div id="note" class="note">---</div>
+      <p>判定の確かさ: <b id="confidence">---</b></p>
+    </div>
   </div>
 
   <div class="card">
     <h2>診断ログ</h2>
     <pre id="log">ページを読み込みました。</pre>
-    <div class="row" style="margin-top:12px">
-      <button id="copyBtn" class="secondary">診断ログをコピー</button>
-    </div>
-    <p class="note">
-      ここに <b>NotAllowedError</b> が出る場合は、ブラウザまたは学校管理ポリシーによるマイク拒否の可能性が高いです。
-      <b>Secure Context: ×</b> の場合は、HTTPSで公開したページから試してください。
-    </p>
   </div>
 </div>
 
 <script>
-(() => {
-  const $ = id => document.getElementById(id);
-  const startBtn = $('startBtn');
-  const stopBtn = $('stopBtn');
-  const statusEl = $('status');
-  const logEl = $('log');
-  const canvas = $('scope');
-  const ctx = canvas.getContext('2d');
+(()=>{
+const $=id=>document.getElementById(id);
+let stream=null, ac=null, analyser=null, src=null, raf=null;
+let data=null, smoothFreq=null;
 
-  let stream = null;
-  let audioContext = null;
-  let analyser = null;
-  let source = null;
-  let rafId = null;
-  let timeData = null;
+function log(s){
+  $('log').textContent += '\n['+new Date().toLocaleTimeString('ja-JP')+'] '+s;
+}
+function status(s,cls=''){ $('status').textContent=s; $('status').className='status '+cls; }
 
-  function log(msg) {
-    const stamp = new Date().toLocaleTimeString('ja-JP');
-    logEl.textContent += `\n[${stamp}] ${msg}`;
-    logEl.scrollTop = logEl.scrollHeight;
+function noteName(freq){
+  if(!freq || freq<40 || freq>2000) return '---';
+  const midi=Math.round(69+12*Math.log2(freq/440));
+  const names=['ド','ド♯','レ','レ♯','ミ','ファ','ファ♯','ソ','ソ♯','ラ','ラ♯','シ'];
+  return names[(midi%12+12)%12] + (Math.floor(midi/12)-1);
+}
+
+/* 正規化自己相関。人の声でも拾いやすいように閾値を緩め、
+   40〜1500 Hz に絞り、最良ピークを探す。 */
+function detectPitch(buf, sampleRate){
+  const n=buf.length;
+  let mean=0;
+  for(let i=0;i<n;i++) mean+=buf[i];
+  mean/=n;
+
+  let rms=0;
+  const x=new Float32Array(n);
+  for(let i=0;i<n;i++){
+    x[i]=buf[i]-mean;
+    rms+=x[i]*x[i];
   }
+  rms=Math.sqrt(rms/n);
+  if(rms<0.008) return {freq:-1,confidence:0};
 
-  function mark(id, ok, textOk, textBad) {
-    const el = $(id);
-    el.textContent = ok ? textOk : textBad;
-    el.className = ok ? 'ok' : 'bad';
-  }
+  const minFreq=40, maxFreq=1500;
+  const minLag=Math.floor(sampleRate/maxFreq);
+  const maxLag=Math.min(Math.floor(sampleRate/minFreq), Math.floor(n/2));
 
-  function setStatus(text, cls='') {
-    statusEl.textContent = text;
-    statusEl.className = 'status ' + cls;
-  }
+  let bestLag=-1, bestCorr=-1;
+  const corr=new Float32Array(maxLag+1);
 
-  function envCheck() {
-    $('ua').textContent = navigator.userAgent;
-    $('url').textContent = location.href;
-    mark('secure', window.isSecureContext, '○ Secure Context', '× Secure Context ではありません');
-    mark('mediaDevices', !!navigator.mediaDevices, '○ 利用可能', '× 利用不可');
-    mark('gum',
-      !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
-      '○ 利用可能',
-      '× 利用不可'
-    );
-    mark('audioCtxSupport', !!(window.AudioContext || window.webkitAudioContext), '○ 利用可能', '× 利用不可');
-
-    log(`Secure Context: ${window.isSecureContext}`);
-    log(`navigator.mediaDevices: ${!!navigator.mediaDevices}`);
-    log(`getUserMedia: ${!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)}`);
-    log(`AudioContext: ${!!(window.AudioContext || window.webkitAudioContext)}`);
-  }
-
-  function noteFromFrequency(freq) {
-    if (!freq || freq < 20 || freq > 5000) return '---';
-    const midi = Math.round(69 + 12 * Math.log2(freq / 440));
-    const names = ['ド','ド♯','レ','レ♯','ミ','ファ','ファ♯','ソ','ソ♯','ラ','ラ♯','シ'];
-    const name = names[(midi % 12 + 12) % 12];
-    const octave = Math.floor(midi / 12) - 1;
-    return `${name}${octave}`;
-  }
-
-  function autoCorrelate(buf, sampleRate) {
-    let SIZE = buf.length;
-    let rms = 0;
-    for (let i = 0; i < SIZE; i++) {
-      const val = (buf[i] - 128) / 128;
-      rms += val * val;
+  for(let lag=minLag;lag<=maxLag;lag++){
+    let sum=0, e1=0, e2=0;
+    const lim=n-lag;
+    for(let i=0;i<lim;i++){
+      const a=x[i], b=x[i+lag];
+      sum+=a*b; e1+=a*a; e2+=b*b;
     }
-    rms = Math.sqrt(rms / SIZE);
-    if (rms < 0.01) return -1;
+    const c=(e1>0&&e2>0)?sum/Math.sqrt(e1*e2):0;
+    corr[lag]=c;
+    if(c>bestCorr){ bestCorr=c; bestLag=lag; }
+  }
 
-    let bestOffset = -1;
-    let bestCorrelation = 0;
-    let foundGoodCorrelation = false;
-    const correlations = new Array(SIZE);
+  if(bestLag<0 || bestCorr<0.35) return {freq:-1,confidence:Math.max(0,bestCorr)};
 
-    for (let offset = 8; offset < SIZE / 2; offset++) {
-      let correlation = 0;
-      for (let i = 0; i < SIZE / 2; i++) {
-        correlation += Math.abs(buf[i] - buf[i + offset]);
-      }
-      correlation = 1 - (correlation / (SIZE / 2) / 255);
-      correlations[offset] = correlation;
-
-      if (correlation > 0.9 && correlation > bestCorrelation) {
-        foundGoodCorrelation = true;
-        bestCorrelation = correlation;
-        bestOffset = offset;
-      } else if (foundGoodCorrelation && correlation < bestCorrelation * 0.98) {
-        break;
+  // 倍音を基本周波数と誤認しにくくする。
+  // 十分高い相関を持つ、より長い周期候補を優先。
+  const target=bestCorr*0.92;
+  for(let lag=bestLag+1;lag<=maxLag;lag++){
+    if(corr[lag]>=target){
+      // 近傍ピークか確認
+      if(corr[lag]>=corr[lag-1] && (lag===maxLag || corr[lag]>=corr[lag+1])){
+        bestLag=lag; bestCorr=corr[lag];
       }
     }
-
-    if (bestCorrelation > 0.01 && bestOffset > 0) {
-      return sampleRate / bestOffset;
-    }
-    return -1;
   }
 
-  function draw() {
-    if (!analyser || !audioContext) return;
+  // 放物線補間
+  let lag=bestLag;
+  if(bestLag>minLag && bestLag<maxLag){
+    const y1=corr[bestLag-1], y2=corr[bestLag], y3=corr[bestLag+1];
+    const d=(y1-2*y2+y3);
+    if(Math.abs(d)>1e-9) lag=bestLag+0.5*(y1-y3)/d;
+  }
 
-    analyser.getByteTimeDomainData(timeData);
+  const f=sampleRate/lag;
+  if(f<minFreq || f>maxFreq) return {freq:-1,confidence:bestCorr};
+  return {freq:f,confidence:bestCorr};
+}
 
-    let sum = 0;
-    for (let i = 0; i < timeData.length; i++) {
-      const v = (timeData[i] - 128) / 128;
-      sum += v * v;
-    }
-    const rms = Math.sqrt(sum / timeData.length);
-    const level = Math.min(100, Math.round(rms * 220));
-    $('levelBar').style.width = level + '%';
-    $('levelText').textContent = level;
+function draw(){
+  if(!analyser||!ac) return;
+  analyser.getFloatTimeDomainData(data);
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#111827';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let rms=0;
+  for(let i=0;i<data.length;i++) rms+=data[i]*data[i];
+  rms=Math.sqrt(rms/data.length);
+  const level=Math.min(100,Math.round(rms*300));
+  $('bar').style.width=level+'%';
+  $('level').textContent=level;
 
-    ctx.strokeStyle = '#9ca3af';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height / 2);
-    ctx.lineTo(canvas.width, canvas.height / 2);
-    ctx.stroke();
+  const c=$('scope'), g=c.getContext('2d');
+  g.clearRect(0,0,c.width,c.height);
+  g.fillStyle='#111827'; g.fillRect(0,0,c.width,c.height);
+  g.strokeStyle='#64748b'; g.lineWidth=1;
+  g.beginPath(); g.moveTo(0,c.height/2); g.lineTo(c.width,c.height/2); g.stroke();
 
-    ctx.strokeStyle = '#f9fafb';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    const slice = canvas.width / timeData.length;
-    for (let i = 0; i < timeData.length; i++) {
-      const v = timeData[i] / 128.0;
-      const y = v * canvas.height / 2;
-      const x = i * slice;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
+  g.strokeStyle='#f8fafc'; g.lineWidth=2; g.beginPath();
+  for(let i=0;i<data.length;i++){
+    const xx=i/(data.length-1)*c.width;
+    const yy=c.height/2 - data[i]*(c.height*0.44);
+    if(i===0) g.moveTo(xx,yy); else g.lineTo(xx,yy);
+  }
+  g.stroke();
 
-    const freq = autoCorrelate(timeData, audioContext.sampleRate);
-    if (freq > 0 && freq < 5000) {
-      $('freq').textContent = Math.round(freq);
-      $('noteName').textContent = '音名: ' + noteFromFrequency(freq);
+  const result=detectPitch(data,ac.sampleRate);
+  if(result.freq>0){
+    if(smoothFreq==null) smoothFreq=result.freq;
+    else smoothFreq=smoothFreq*0.80+result.freq*0.20;
+    $('freq').textContent=Math.round(smoothFreq);
+    $('note').textContent=noteName(smoothFreq);
+    $('confidence').textContent=Math.round(result.confidence*100)+'%';
+  }else{
+    // すぐ消さず少しだけ保持。ただし無音なら消す。
+    if(rms<0.006){
+      smoothFreq=null;
+      $('freq').textContent='---';
+      $('note').textContent='---';
+      $('confidence').textContent='---';
     } else {
-      $('freq').textContent = '---';
-      $('noteName').textContent = '音名: ---';
-    }
-
-    rafId = requestAnimationFrame(draw);
-  }
-
-  async function startMic() {
-    setStatus('マイク要求中…', 'warn');
-    startBtn.disabled = true;
-    log('マイク取得を開始します。');
-
-    if (!window.isSecureContext) {
-      setStatus('HTTPSではありません', 'bad');
-      log('停止: Secure Context ではありません。HTTPSで公開したページから試してください。');
-      startBtn.disabled = false;
-      return;
-    }
-
-    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
-      setStatus('getUserMedia 利用不可', 'bad');
-      log('停止: navigator.mediaDevices.getUserMedia が利用できません。');
-      startBtn.disabled = false;
-      return;
-    }
-
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
-        },
-        video: false
-      });
-
-      log('getUserMedia 成功。音声トラックを取得しました。');
-      const tracks = stream.getAudioTracks();
-      tracks.forEach((t, i) => {
-        log(`AudioTrack ${i + 1}: label="${t.label}", enabled=${t.enabled}, muted=${t.muted}, readyState=${t.readyState}`);
-        if (t.getSettings) {
-          try {
-            log('Track settings: ' + JSON.stringify(t.getSettings()));
-          } catch (_) {}
-        }
-      });
-
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      audioContext = new AudioCtx();
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
-      }
-      log(`AudioContext state: ${audioContext.state}, sampleRate=${audioContext.sampleRate}`);
-
-      analyser = audioContext.createAnalyser();
-      analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.1;
-      timeData = new Uint8Array(analyser.fftSize);
-
-      source = audioContext.createMediaStreamSource(stream);
-      source.connect(analyser);
-
-      setStatus('マイク取得成功 ✅', 'ok');
-      stopBtn.disabled = false;
-      draw();
-
-    } catch (err) {
-      const name = err && err.name ? err.name : 'UnknownError';
-      const message = err && err.message ? err.message : String(err);
-      setStatus(`${name}`, 'bad');
-      log(`マイク取得失敗: ${name}`);
-      log(`詳細: ${message}`);
-
-      if (name === 'NotAllowedError') {
-        log('推定原因: サイト権限、ChromeOS管理ポリシー、またはブラウザ設定でマイクが拒否されています。');
-      } else if (name === 'NotFoundError') {
-        log('推定原因: 利用可能なマイク入力デバイスが見つかりません。');
-      } else if (name === 'NotReadableError') {
-        log('推定原因: マイクが他アプリで占有されている、またはOS側で読み取りできません。');
-      } else if (name === 'SecurityError') {
-        log('推定原因: セキュリティ設定またはポリシーでブロックされています。');
-      } else if (name === 'OverconstrainedError') {
-        log('推定原因: 指定した音声条件を端末が満たせません。');
-      }
-    } finally {
-      startBtn.disabled = false;
+      $('confidence').textContent=Math.round(result.confidence*100)+'%';
     }
   }
 
-  function stopMic() {
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = null;
-    if (source) {
-      try { source.disconnect(); } catch (_) {}
-      source = null;
-    }
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-    if (audioContext) {
-      try { audioContext.close(); } catch (_) {}
-      audioContext = null;
-    }
-    analyser = null;
-    $('levelBar').style.width = '0%';
-    $('levelText').textContent = '0';
-    $('freq').textContent = '---';
-    $('noteName').textContent = '音名: ---';
-    setStatus('停止しました');
-    stopBtn.disabled = true;
-    log('マイクを停止しました。');
+  raf=requestAnimationFrame(draw);
+}
+
+$('start').onclick=async()=>{
+  $('start').disabled=true; status('マイク要求中…','warn'); log('マイク取得開始');
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false
+    });
+    const AC=window.AudioContext||window.webkitAudioContext;
+    ac=new AC();
+    if(ac.state==='suspended') await ac.resume();
+    analyser=ac.createAnalyser();
+    analyser.fftSize=4096;
+    analyser.smoothingTimeConstant=0;
+    data=new Float32Array(analyser.fftSize);
+    src=ac.createMediaStreamSource(stream);
+    src.connect(analyser);
+    status('マイク取得成功 ✅','ok');
+    $('stop').disabled=false;
+    log('取得成功 / sampleRate='+ac.sampleRate+' / fftSize='+analyser.fftSize);
+    draw();
+  }catch(e){
+    status(e.name||'Error','bad');
+    log('失敗: '+(e.name||'Error')+' / '+(e.message||e));
+  }finally{
+    $('start').disabled=false;
   }
+};
 
-  async function copyLog() {
-    const text = [
-      '理科マイク診断',
-      'URL: ' + location.href,
-      'Secure Context: ' + window.isSecureContext,
-      'UserAgent: ' + navigator.userAgent,
-      '',
-      logEl.textContent
-    ].join('\n');
-    try {
-      await navigator.clipboard.writeText(text);
-      log('診断ログをクリップボードへコピーしました。');
-    } catch (e) {
-      log('コピーできませんでした: ' + e);
-    }
-  }
-
-  startBtn.addEventListener('click', startMic);
-  stopBtn.addEventListener('click', stopMic);
-  $('copyBtn').addEventListener('click', copyLog);
-
-  envCheck();
+$('stop').onclick=()=>{
+  if(raf) cancelAnimationFrame(raf);
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  if(src) try{src.disconnect()}catch(e){}
+  if(ac) try{ac.close()}catch(e){}
+  stream=ac=analyser=src=raf=null; smoothFreq=null;
+  $('stop').disabled=true; $('bar').style.width='0%'; $('level').textContent='0';
+  $('freq').textContent='---'; $('note').textContent='---'; $('confidence').textContent='---';
+  status('停止しました'); log('停止');
+};
 })();
 </script>
 </body>
