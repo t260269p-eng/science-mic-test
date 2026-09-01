@@ -29,6 +29,7 @@ canvas{display:block;width:100%;height:230px;background:#111827;border-radius:12
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .big{font-size:40px;font-weight:900}
 .small{font-size:14px;color:var(--muted)}
+.rangeRow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.rangeRow input[type=range]{flex:1;min-width:220px}
 .compareBox{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:14px}
 .gameTarget{font-size:28px;font-weight:900;text-align:center;margin:8px 0}
 .gameMsg{text-align:center;font-size:22px;font-weight:800;min-height:34px}
@@ -69,6 +70,12 @@ canvas{display:block;width:100%;height:230px;background:#111827;border-radius:12
 
     <div class="card">
       <h2>波形</h2>
+      <div class="rangeRow" style="margin-bottom:12px">
+        <label for="timeWindow"><b>横軸の時間幅</b></label>
+        <input id="timeWindow" type="range" min="20" max="100" step="5" value="30">
+        <span><b id="timeWindowText">30</b> ms</span>
+      </div>
+      <p class="small" style="margin-top:0">短くすると波を大きく見やすく、長くすると広い範囲を観察できます。</p>
       <canvas id="scope" width="900" height="230"></canvas>
     </div>
 
@@ -156,14 +163,30 @@ let mode='home';
 let stream=null, ac=null, analyser=null, source=null, raf=null;
 let data=null, smoothFreq=null, currentLevel=0, currentFreq=null, currentConfidence=0;
 let snapA=null,snapB=null;
+let displayMs=30;
 
-function drawStoredWave(canvasId, samples){
+function getDisplaySlice(samples, sampleRate){
+  if(!samples || !samples.length) return [];
+  const wanted=Math.max(32,Math.min(samples.length,Math.round(sampleRate*displayMs/1000)));
+
+  // 位相の違いで見比べにくくならないよう、上向きのゼロクロス付近から表示
+  let start=0;
+  const searchMax=Math.max(1,samples.length-wanted);
+  for(let i=1;i<searchMax;i++){
+    if(samples[i-1]<=0 && samples[i]>0){
+      start=i;
+      break;
+    }
+  }
+  return samples.slice(start,start+wanted);
+}
+
+function drawStoredWave(canvasId, samples, sampleRate){
   const c=$(canvasId), g=c.getContext('2d');
   g.clearRect(0,0,c.width,c.height);
   g.fillStyle='#111827';
   g.fillRect(0,0,c.width,c.height);
 
-  // 中央線
   g.strokeStyle='#64748b';
   g.lineWidth=1;
   g.beginPath();
@@ -179,13 +202,13 @@ function drawStoredWave(canvasId, samples){
     return;
   }
 
-  // 観察画面と同じ倍率で描画する
+  const view=getDisplaySlice(samples,sampleRate || 48000);
   g.strokeStyle='#f8fafc';
   g.lineWidth=2;
   g.beginPath();
-  for(let i=0;i<samples.length;i++){
-    const xx=i/(samples.length-1)*c.width;
-    const yy=c.height/2-samples[i]*(c.height*.44);
+  for(let i=0;i<view.length;i++){
+    const xx=i/(Math.max(1,view.length-1))*c.width;
+    const yy=c.height/2-view[i]*(c.height*.44);
     if(i===0) g.moveTo(xx,yy);
     else g.lineTo(xx,yy);
   }
@@ -270,10 +293,11 @@ function drawScope(){
   g.fillStyle='#111827';g.fillRect(0,0,c.width,c.height);
   g.strokeStyle='#64748b';g.lineWidth=1;
   g.beginPath();g.moveTo(0,c.height/2);g.lineTo(c.width,c.height/2);g.stroke();
+  const liveView=getDisplaySlice(Array.from(data),ac.sampleRate);
   g.strokeStyle='#f8fafc';g.lineWidth=2;g.beginPath();
-  for(let i=0;i<data.length;i++){
-    const xx=i/(data.length-1)*c.width;
-    const yy=c.height/2-data[i]*(c.height*.44);
+  for(let i=0;i<liveView.length;i++){
+    const xx=i/(Math.max(1,liveView.length-1))*c.width;
+    const yy=c.height/2-liveView[i]*(c.height*.44);
     if(i===0)g.moveTo(xx,yy);else g.lineTo(xx,yy);
   }
   g.stroke();
@@ -344,19 +368,20 @@ function saveSnap(which){
   const s={
     level:currentLevel,
     freq:currentFreq?Math.round(currentFreq):null,
-    wave:wave
+    wave:wave,
+    sampleRate:ac?ac.sampleRate:48000
   };
 
   if(which==='A'){
     snapA=s;
     $('aLevel').textContent=s.level;
     $('aFreq').textContent=s.freq??'---';
-    drawStoredWave('waveA',s.wave);
+    drawStoredWave('waveA',s.wave,s.sampleRate);
   }else{
     snapB=s;
     $('bLevel').textContent=s.level;
     $('bFreq').textContent=s.freq??'---';
-    drawStoredWave('waveB',s.wave);
+    drawStoredWave('waveB',s.wave,s.sampleRate);
   }
   compareSnaps();
 }
@@ -380,6 +405,14 @@ function compareSnaps(){
   }
   $('compareMsg').textContent=msgs.join(' ／ ');
 }
+
+
+$('timeWindow').addEventListener('input',()=>{
+  displayMs=Number($('timeWindow').value);
+  $('timeWindowText').textContent=displayMs;
+  if(snapA) drawStoredWave('waveA',snapA.wave,snapA.sampleRate);
+  if(snapB) drawStoredWave('waveB',snapB.wave,snapB.sampleRate);
+});
 
 /* GAME */
 const challenges=[
